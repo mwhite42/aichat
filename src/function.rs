@@ -250,8 +250,6 @@ pub fn run_llm_function(
     cmd_args: Vec<String>,
     mut envs: HashMap<String, String>,
 ) -> Result<Option<String>> {
-    let prompt = format!("Call {cmd_name} {}", cmd_args.join(" "));
-
     let mut bin_dirs: Vec<PathBuf> = vec![];
     if cmd_args.len() > 1 {
         let dir = Config::agent_functions_dir(&cmd_name).join("bin");
@@ -273,9 +271,7 @@ pub fn run_llm_function(
 
     #[cfg(windows)]
     let cmd_name = polyfill_cmd_name(&cmd_name, &bin_dirs);
-    if *IS_STDOUT_TERMINAL {
-        println!("{}", dimmed_text(&prompt));
-    }
+    // Tool handles its own output messaging
     let exit_code = run_command(&cmd_name, &cmd_args, Some(envs))
         .map_err(|err| anyhow!("Unable to run {cmd_name}, {err}"))?;
     if exit_code != 0 {

@@ -137,6 +137,7 @@ pub struct Config {
     pub document_loaders: HashMap<String, String>,
 
     pub highlight: bool,
+    pub hide_thinking: bool,
     pub theme: Option<String>,
     pub left_prompt: Option<String>,
     pub right_prompt: Option<String>,
@@ -212,6 +213,7 @@ impl Default for Config {
             document_loaders: Default::default(),
 
             highlight: true,
+            hide_thinking: true,
             theme: None,
             left_prompt: None,
             right_prompt: None,
@@ -605,6 +607,7 @@ impl Config {
             ("wrap", wrap),
             ("wrap_code", self.wrap_code.to_string()),
             ("highlight", self.highlight.to_string()),
+            ("hide_thinking", self.hide_thinking.to_string()),
             ("theme", format_option_value(&self.theme)),
             ("config_file", display_path(&Self::config_file())),
             ("env_file", display_path(&Self::env_file())),
@@ -688,6 +691,10 @@ impl Config {
             "highlight" => {
                 let value = value.parse().with_context(|| "Invalid value")?;
                 config.write().highlight = value;
+            }
+            "hide_thinking" => {
+                let value = value.parse().with_context(|| "Invalid value")?;
+                config.write().hide_thinking = value;
             }
             _ => bail!("Unknown key '{key}'"),
         }
@@ -1937,7 +1944,7 @@ impl Config {
             env::var("COLORTERM").as_ref().map(|v| v.as_str()),
             Ok("truecolor")
         );
-        Ok(RenderOptions::new(theme, wrap, self.wrap_code, truecolor))
+        Ok(RenderOptions::new(theme, wrap, self.wrap_code, truecolor, self.light_theme()))
     }
 
     pub fn render_prompt_left(&self) -> String {

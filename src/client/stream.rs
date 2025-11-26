@@ -13,15 +13,23 @@ pub struct SseHandler {
     abort_signal: AbortSignal,
     buffer: String,
     tool_calls: Vec<ToolCall>,
+    hide_thinking: bool,
+    in_thinking_block: bool,
+    thinking_content: String,
+    thinking_shown: bool,
 }
 
 impl SseHandler {
-    pub fn new(sender: UnboundedSender<SseEvent>, abort_signal: AbortSignal) -> Self {
+    pub fn new_with_config(sender: UnboundedSender<SseEvent>, abort_signal: AbortSignal, hide_thinking: bool) -> Self {
         Self {
             sender,
             abort_signal,
             buffer: String::new(),
             tool_calls: Vec::new(),
+            hide_thinking,
+            in_thinking_block: false,
+            thinking_content: String::new(),
+            thinking_shown: false,
         }
     }
 
@@ -30,6 +38,74 @@ impl SseHandler {
         if text.is_empty() {
             return Ok(());
         }
+        
+        // Handle thinking blocks when hide_thinking is enabled
+        if self.hide_thinking {
+            // If we're currently in a thinking block, collect content but don't send
+            if self.in_thinking_block {
+                // Check for end of thinking block
+                if text.contains("</think>") {
+                    self.in_thinking_block = false;
+                    // Skip the closing tag and any following content in this chunk
+                    if let Some(after_think) = text.split("</think>").nth(1) {
+                        // Process any content after the </think> tag
+                        let cleaned = after_think.trim_start_matches('\n');
+                        if !cleaned.is_empty() {
+                            self.buffer.push_str(cleaned);
+                            let ret = self
+                                .sender
+                                .send(SseEvent::Text(cleaned.to_string()))
+                                .with_context(|| "Failed to send SseEvent:Text");
+                            if let Err(err) = ret {
+                                if self.abort_signal.aborted() {
+                                    return Ok(());
+                                }
+                                return Err(err);
+                            }
+                        }
+                    }
+                    return Ok(());
+                } else {
+                    // Still inside thinking block, collect but don't send
+                    self.thinking_content.push_str(text);
+                    return Ok(());
+                }
+            }
+            
+            // Check for start of thinking block
+            if text.contains("<think>") {
+                self.in_thinking_block = true;
+                self.thinking_content.clear();
+                
+                // Show thinking indicator only once
+                if !self.thinking_shown {
+                    self.thinking_shown = true;
+                    let indicator = "🤔 Thinking...\n";
+                    self.buffer.push_str(indicator);
+                    let ret = self
+                        .sender
+                        .send(SseEvent::Text(indicator.to_string()))
+                        .with_context(|| "Failed to send thinking indicator");
+                    if let Err(err) = ret {
+                        if self.abort_signal.aborted() {
+                            return Ok(());
+                        }
+                        return Err(err);
+                    }
+                }
+                
+                // Process any thinking content in the same chunk
+                if let Some(after_think) = text.split("<think>").nth(1) {
+                    let cleaned = after_think.trim_start_matches('\n');
+                    if !cleaned.is_empty() {
+                        self.thinking_content.push_str(cleaned);
+                    }
+                }
+                return Ok(());
+            }
+        }
+        
+        // Normal text processing
         self.buffer.push_str(text);
         let ret = self
             .sender

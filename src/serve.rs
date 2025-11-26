@@ -322,10 +322,11 @@ impl Server {
 
         if stream {
             let (tx, mut rx) = unbounded_channel();
+            let hide_thinking = config.read().hide_thinking;
             tokio::spawn(async move {
                 let is_first = Arc::new(AtomicBool::new(true));
                 let (sse_tx, sse_rx) = unbounded_channel();
-                let mut handler = SseHandler::new(sse_tx, abort_signal);
+                let mut handler = SseHandler::new_with_config(sse_tx, abort_signal, hide_thinking);
                 async fn map_event(
                     mut sse_rx: UnboundedReceiver<SseEvent>,
                     tx: &UnboundedSender<ResEvent>,

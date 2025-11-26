@@ -10,6 +10,7 @@ keybindings: emacs               # Choose keybinding style (emacs, vi)
 editor: null                     # Specifies the command used to edit input buffer or session. (e.g. vim, emacs, nano).
 wrap: no                         # Controls text wrapping (no, auto, <max-width>)
 wrap_code: false                 # Enables or disables wrapping of code blocks
+hide_thinking: true              # Hide thinking blocks and show a simple indicator instead
 
 # ---- function-calling ----
 # Visit https://github.com/sigoden/llm-functions for setup instructions
